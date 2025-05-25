@@ -8,3 +8,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install openai
 ```
+
+
+run tests with `python3 -m tests.tests`
+
