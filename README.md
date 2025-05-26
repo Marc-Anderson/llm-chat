@@ -10,6 +10,8 @@ a terribly designed but simple, lightweight, and universal template for interact
 * provides a plug-and-play interface for tool usage
 * handles prompt history and system messages
 * lets you swap out display logic (terminal, streamlit, etc.)
+* no database or other resources
+* optional template for use with streamlit
 
 ---
 
@@ -29,6 +31,17 @@ a terribly designed but simple, lightweight, and universal template for interact
    OPENAI_API_KEY=your_openai_key
    GEMINI_API_KEY=your_gemini_key
    ```
+
+3. to use the streamlit app 
+    ```sh
+    pip install streamlit
+    ```
+
+4. run the streamlit app
+    ```sh
+    streamlit run streamlit.py
+    ```
+
 
 ---
 
