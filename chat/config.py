@@ -4,7 +4,8 @@ import os
 
 # region config
 
-MODEL_NAME = "gpt-4.1"
+OPENAI_MODEL_NAME = "gpt-4.1"
+GEMINI_MODEL_NAME = "gemini-2.0-flash"
 
 # endregion config
 
@@ -41,6 +42,7 @@ def load_env():
 load_env()
 
 openai_api_key = os.getenv("OPENAI_API_KEY")
+gemini_api_key = os.getenv("GEMINI_API_KEY")
 
 if not openai_api_key:
     raise ValueError(

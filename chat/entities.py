@@ -52,7 +52,7 @@ class ChatConversation:
         else:
             self.messages.append(turn)
 
-    def to_api_format(self, messages=None) -> list[dict]:
+    def to_api_format(self, messages=None, gemini=False) -> list[dict]:
         """Convert the conversation to the API format, removes any excluded messages and format the conversation"""
 
         # if data is provided, use that instead of the current messages
@@ -60,6 +60,13 @@ class ChatConversation:
 
         output_conv = []
         current_cycle = []
+
+        if gemini:
+            # first pass: map call_id to function name for outputs
+            call_id_to_name_map = {}
+            for message in message_list:
+                if hasattr(message, "type") and message.type == "function_call":
+                    call_id_to_name_map[message.call_id] = message.name
 
         for idx, message in reversed(list(enumerate(message_list))):
 
@@ -70,13 +77,14 @@ class ChatConversation:
             # clean up the message for the api
             message_excluded = message.pop("excluded", None)
 
-            if "arguments" in message:
-                # if this is a tool call, we need to convert the args to a string
-                message["arguments"] = json.dumps(message["arguments"])
+            if not gemini:
+                if "arguments" in message:
+                    # if this is a tool call, we need to convert the args to a string
+                    message["arguments"] = json.dumps(message["arguments"])
 
-            if "output" in message:
-                # if this is a tool call, we need to convert the args to a string
-                message["output"] = str(message["output"])
+                if "output" in message:
+                    # if this is a tool call, we need to convert the args to a string
+                    message["output"] = str(message["output"])
 
             # if this is a system message or the first message, thats it, exit
             if idx == 0 or message.get("role") == "system":
@@ -112,14 +120,62 @@ class ChatConversation:
                 output_conv.extend(current_cycle)
                 current_cycle = []
 
-        return list(reversed(output_conv))
+        result = list(reversed(output_conv))
+        if gemini:
+            # format the messages for gemini
+            result = [
+                self.gemini_formatter(message, call_id_to_name_map)
+                for message in result
+            ]
+        return result
+
+    @staticmethod
+    def gemini_formatter(message, call_id_to_name_map):
+        if message.get("role"):
+            return {
+                "parts": [{"text": message["content"]}],
+                "role": (message["role"] if message["role"] == "user" else "model"),
+            }
+        elif message.get("type") == "function_call":
+            return {
+                "parts": [
+                    {
+                        "function_call": {
+                            "name": message["name"],
+                            "args": message["arguments"],
+                        }
+                    }
+                ],
+                "role": "model",
+            }
+        elif message.get("type") == "function_call_output":
+            return {
+                "parts": [
+                    {
+                        "function_response": {
+                            "name": call_id_to_name_map.get(
+                                message["call_id"], "unknown_function"
+                            ),
+                            "response": {"output": message["output"]},
+                        }
+                    }
+                ],
+                "role": "user",
+            }
 
     @property
     def is_user_turn(self):
         """check if the last message in the conversation is an assistant turn."""
         if not self.messages:
             return False
-        return self.messages[-1].model_dump().get("role") == "assistant"
+        message_json = self.messages[-1].model_dump()
+        # check if the last message is a user turn,
+        if message_json.get("role") == "assistant":
+            return True
+        # check if the last message is a function response
+        if message_json.get("type") == "function_call_output":
+            return False
+        return True
 
     def asdict(self):
         return [message.model_dump() for message in self.messages]

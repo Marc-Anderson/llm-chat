@@ -1,7 +1,6 @@
-# %%
 import logging
 from pathlib import Path
-from chat.chat import handle_prompt as _handle_prompt
+from chat.chat import prompt_handler
 from chat.entities import ChatConversation
 from chat.presenter import TerminalContentPresenter
 
@@ -9,15 +8,6 @@ logger = logging.getLogger(__name__)
 
 
 # region tools
-
-
-def get_current_weather(city: str):
-    """get the current weather information
-
-    Args:
-        city (str): The name of the city
-    """
-    return {"temperature": "25°C", "condition": "Sunny"}
 
 
 def get_stock_price(symbol: str):
@@ -29,55 +19,78 @@ def get_stock_price(symbol: str):
     return {"symbol": symbol, "price": 150.00}
 
 
-# endregion tools
-
-# region setup
-
-# choose a system prompt
-system_prompt = "you are a down to earth, very simple person. never say more words than necessary. responses always leave a lot to be desired"
-
-# initialize the conversation with the system prompt
-conversation = ChatConversation([{"role": "system", "content": system_prompt}])
-
-# define the tools available to the assistant
 available_tools = {
-    "get_current_weather": get_current_weather,
     "get_stock_price": get_stock_price,
+    # "get_current_weather": get_current_weather,
 }
 
-# endregion setup
+# endregion tools
 
 
-# region prompt handling
+# region conversation
+
+conversation = ChatConversation(
+    [
+        {
+            "role": "system",
+            "content": "you are a down to earth, very simple person, dont get too wordy. just be chill, you know the drill",
+        }
+    ]
+)
+
+# endregion conversation
+
+
+# region main
 
 
 def handle_prompt(prompt: str, excluded_from_history=False):
+    # make the global conversation available in the function
     global conversation
-
-    conversation = _handle_prompt(
-        prompt,
-        conversation,
-        available_tools,
-        excluded_from_history,
-        TerminalContentPresenter,
+    # process the prompt and update the conversation
+    conversation = prompt_handler(
+        prompt,  # the user prompt
+        conversation,  # the conversation(without the user prompt)
+        available_tools,  # your tools lookup dictionary
+        excluded_from_history,  # whether this turn should be remembered
+        TerminalContentPresenter,  # the class thats used to show the messages to the user
+        "openai",  # the ai service you want to use
     )
 
     return conversation
 
 
-# # simulate a prompt
-# prompt = "What is apples stock price"
-# conversation = prompt_terminal(prompt)
+# endregion main
 
-# prompt = "What is happening on grand junction co this weekend?"
-# conversation = handle_prompt(prompt)
 
-while True:
-    prompt = input("You: ")
-    if prompt.lower() in ["exit", "quit"]:
-        break
-    print("")
-    conversation = handle_prompt(prompt)
-    print("")
+# region terminal chat
 
-conversation.save("chat_history.json")
+
+def terminal_chat():
+
+    print("Welcome to the terminal chat!")
+    print("Type your messages below. Type 'q', 'exit' or 'quit' to end the chat.")
+
+    while True:
+        prompt = input("You: ")
+        # remove what you just typed so the content presenter can update the line
+        print("\033[F\033[K", end="")
+        if prompt.lower() in ["exit", "quit", "q"]:
+            break
+        conversation = handle_prompt(prompt)
+        print("")
+
+    conversation.save("chat_history.json")
+
+
+# endregion terminal chat
+
+
+if __name__ == "__main__":
+
+    # sample conversation
+    conversation = handle_prompt("What's the stock price of AAPL?")
+    conversation.save("sample_conversation.json")
+
+    # # terminal chat
+    # terminal_chat()
